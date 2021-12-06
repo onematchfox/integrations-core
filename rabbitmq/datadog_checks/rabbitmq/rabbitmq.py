@@ -25,7 +25,7 @@ MAX_DETAILED_NODES = 100
 # collect is above 90% of the limit:
 ALERT_THRESHOLD = 0.9
 EXCHANGE_ATTRIBUTES = [
-    # Path, Name, Operation
+    # Path, Name, Operation, Default
     ('message_stats/ack', 'messages.ack.count', float),
     ('message_stats/ack_details/rate', 'messages.ack.rate', float),
     ('message_stats/confirm', 'messages.confirm.count', float),
@@ -44,7 +44,7 @@ EXCHANGE_ATTRIBUTES = [
     ('message_stats/redeliver_details/rate', 'messages.redeliver.rate', float),
 ]
 QUEUE_ATTRIBUTES = [
-    # Path, Name, Operation
+    # Path, Name, Operation, Default
     ('active_consumers', 'active_consumers', float),
     ('consumers', 'consumers', float),
     ('consumer_utilisation', 'consumer_utilisation', float),
@@ -66,9 +66,11 @@ QUEUE_ATTRIBUTES = [
     ('message_stats/publish_details/rate', 'messages.publish.rate', float),
     ('message_stats/redeliver', 'messages.redeliver.count', float),
     ('message_stats/redeliver_details/rate', 'messages.redeliver.rate', float),
+    ('running', 'state', self._is_running, 0),
 ]
 
 NODE_ATTRIBUTES = [
+    # Path, Name, Operation, Default
     ('fd_used', 'fd_used', float),
     ('disk_free', 'disk_free', float),
     ('mem_used', 'mem_used', float),
@@ -82,6 +84,7 @@ NODE_ATTRIBUTES = [
 ]
 
 OVERVIEW_ATTRIBUTES = [
+    # Path, Name, Operation, Default
     ("object_totals/connections", "object_totals.connections", float),
     ("object_totals/channels", "object_totals.channels", float),
     ("object_totals/queues", "object_totals.queues", float),
@@ -534,7 +537,7 @@ class RabbitMQ(AgentCheck):
     def _get_metrics(self, data, object_type, custom_tags):
         tags = self._get_tags(data, object_type, custom_tags)
         metrics_sent = 0
-        for attribute, metric_name, operation in ATTRIBUTES[object_type]:
+        for attribute, metric_name, operation, default in ATTRIBUTES[object_type]:
             # Walk down through the data path, e.g. foo/bar => d['foo']['bar']
             root = data
             keys = attribute.split('/')
@@ -544,7 +547,7 @@ class RabbitMQ(AgentCheck):
                 if not isinstance(root, dict):
                     break
                 root = root.get(path, {})
-            value = root.get(keys[-1], None) if isinstance(root, dict) else None
+            value = root.get(keys[-1], default) if isinstance(root, dict) else default
 
             if value is not None:
                 try:
@@ -674,3 +677,11 @@ class RabbitMQ(AgentCheck):
                 message = u"Response from aliveness API: {}".format(aliveness_response)
 
             self.service_check('rabbitmq.aliveness', status, tags, message=message)
+
+    def _is_running(value):
+        """
+        Checks that the specified value is requal to the string "running"
+        Returns 1 if true and 0 i false
+        """
+
+        return 1 if value == "running" else 0
